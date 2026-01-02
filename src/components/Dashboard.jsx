@@ -4,7 +4,7 @@ import { MessageEditor } from './MessageEditor';
 import { SendingProgress } from './SendingProgress';
 import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle } from './ui-base';
 import { getProvider, PROVIDERS } from '../lib/sms-providers';
-import { Settings, Send, PlayCircle, StopCircle, RefreshCw } from 'lucide-react';
+import { Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function Dashboard() {
@@ -26,6 +26,10 @@ export function Dashboard() {
     const [isSending, setIsSending] = useState(false);
     const [progress, setProgress] = useState({ sent: 0, failed: 0 });
     const [logs, setLogs] = useState([]);
+
+    // Test Message State
+    const [testPhoneNumber, setTestPhoneNumber] = useState('');
+    const [isSendingTest, setIsSendingTest] = useState(false);
 
     const stopRef = useRef(false);
 
@@ -145,6 +149,39 @@ export function Dashboard() {
         addLog("Batch processing finished.");
     };
 
+    const sendTestMessage = async () => {
+        if (!testPhoneNumber.trim()) {
+            alert("Please enter a test phone number.");
+            return;
+        }
+        if (!template.trim()) {
+            alert("Please enter a message template first.");
+            return;
+        }
+
+        setIsSendingTest(true);
+        addLog(`Sending test message to ${testPhoneNumber}...`, 'info');
+
+        try {
+            // Use first row of CSV data, or empty object if no CSV
+            const testRow = csvData.length > 0 ? csvData[0] : {};
+            const message = interpolate(template, testRow);
+
+            const provider = getProvider(providerType);
+            const result = await provider.send(testPhoneNumber, message, apiConfig);
+
+            if (result.success) {
+                addLog(`✓ Test message sent successfully to ${testPhoneNumber} (ID: ${result.id})`, 'info');
+            } else {
+                addLog(`✗ Test message failed: ${result.error}`, 'error');
+            }
+        } catch (err) {
+            addLog(`✗ Test message error: ${err.message}`, 'error');
+        } finally {
+            setIsSendingTest(false);
+        }
+    };
+
     const stopSending = () => {
         stopRef.current = true;
     };
@@ -189,8 +226,52 @@ export function Dashboard() {
 
                 {/* Right Column: Settings & Progress */}
                 <div className="lg:col-span-5 space-y-6">
+                    {/* Test Message Section */}
                     <section>
-                        <h2 className="text-lg font-semibold mb-4 text-slate-800">3. Configuration</h2>
+                        <h2 className="text-lg font-semibold mb-4 text-slate-800">3. Test Message</h2>
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <TestTube className="w-4 h-4" /> Send Test SMS
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Test Phone Number</Label>
+                                    <Input
+                                        type="tel"
+                                        placeholder="+15551234567"
+                                        value={testPhoneNumber}
+                                        onChange={(e) => setTestPhoneNumber(e.target.value)}
+                                        disabled={isSendingTest}
+                                    />
+                                    <p className="text-xs text-slate-500">
+                                        {csvData.length > 0
+                                            ? "Will use first row of CSV data for variables"
+                                            : "Variables will show as placeholders (no CSV loaded)"}
+                                    </p>
+                                </div>
+                                <Button
+                                    className="w-full gap-2"
+                                    onClick={sendTestMessage}
+                                    disabled={isSendingTest || !template.trim()}
+                                >
+                                    {isSendingTest ? (
+                                        <>
+                                            <RefreshCw className="w-4 h-4 animate-spin" /> Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <TestTube className="w-4 h-4" /> Send Test
+                                        </>
+                                    )}
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </section>
+
+                    <section>
+                        <h2 className="text-lg font-semibold mb-4 text-slate-800">4. Configuration</h2>
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -267,7 +348,7 @@ export function Dashboard() {
                     </section>
 
                     <section>
-                        <h2 className="text-lg font-semibold mb-4 text-slate-800">4. Execution</h2>
+                        <h2 className="text-lg font-semibold mb-4 text-slate-800">5. Execution</h2>
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             {!isSending ? (
                                 <Button
