@@ -7,13 +7,17 @@ import { getProvider, PROVIDERS } from '../lib/sms-providers';
 import { cn } from '../lib/utils';
 import { normalizePhoneNumber } from '../lib/phone-utils';
 import { Toaster, useToasts } from './Toaster';
-import { Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube, Calendar } from 'lucide-react';
+import {
+    Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube, Calendar,
+    Eye, X, Trash2, CheckCircle2, ChevronRight
+} from 'lucide-react';
 
 export function Dashboard() {
-    // State with localStorage persistence
+    // Data State
     const [csvData, setCsvData] = useState([]);
     const [fileName, setFileName] = useState(() => localStorage.getItem('bulksms_fileName') || "");
     const [template, setTemplate] = useState(() => localStorage.getItem('bulksms_template') || "");
+    const [showDataPreview, setShowDataPreview] = useState(false);
 
     // Config State
     const [providerType, setProviderType] = useState(() => localStorage.getItem('bulksms_providerType') || PROVIDERS.MOCK);
@@ -450,6 +454,7 @@ export function Dashboard() {
                                 onDataLoaded={setCsvData}
                                 onSuccess={addToast}
                                 onFileName={setFileName}
+                                onPreview={() => setShowDataPreview(true)}
                             />
                             {fileName && (
                                 <div className="mt-3 space-y-3">
@@ -794,6 +799,101 @@ export function Dashboard() {
                     </Button>
                 )}
             </div>
+
+            {/* Data Preview Modal */}
+            {showDataPreview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <Card className="w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+                        <CardHeader className="p-4 border-b border-slate-100 bg-white flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                    <Eye className="w-5 h-5 text-blue-600" /> Loaded Contacts
+                                </CardTitle>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Previewing <span className="font-bold text-slate-700">{csvData.length}</span> rows from <span className="underline">{fileName || "Cloud Link"}</span>
+                                </p>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-full h-10 w-10 hover:bg-slate-100"
+                                onClick={() => setShowDataPreview(false)}
+                            >
+                                <X className="w-5 h-5" />
+                            </Button>
+                        </CardHeader>
+
+                        <CardContent className="flex-1 overflow-auto p-0 bg-slate-50/50">
+                            <div className="inline-block min-w-full align-middle">
+                                <table className="min-w-full border-separate border-spacing-0">
+                                    <thead className="sticky top-0 bg-white border-b border-slate-200 z-10">
+                                        <tr>
+                                            {columns.map((col, idx) => (
+                                                <th
+                                                    key={idx}
+                                                    className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200"
+                                                >
+                                                    {col}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-transparent">
+                                        {csvData.slice(0, 100).map((row, rowIdx) => (
+                                            <tr key={rowIdx} className="hover:bg-white transition-colors">
+                                                {columns.map((col, colIdx) => (
+                                                    <td key={colIdx} className="px-4 py-2.5 text-xs text-slate-600 border-b border-slate-100">
+                                                        {row[col]?.toString() || ""}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {csvData.length > 100 && (
+                                    <div className="p-4 text-center text-[10px] text-slate-400 font-medium">
+                                        Showing first 100 of {csvData.length} rows
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+
+                        <div className="p-4 bg-white border-t border-slate-100 flex items-center justify-between gap-4">
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-10 px-4 font-bold flex gap-2 rounded-xl"
+                                onClick={() => {
+                                    setCsvData([]);
+                                    setShowDataPreview(false);
+                                    addToast("Data cleared", "info");
+                                }}
+                            >
+                                <Trash2 className="w-4 h-4" /> Delete All Data
+                            </Button>
+
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="h-10 font-bold rounded-xl"
+                                    onClick={() => setShowDataPreview(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    className="h-10 bg-slate-900 text-white font-bold rounded-xl px-6 flex gap-2"
+                                    onClick={() => {
+                                        setShowDataPreview(false);
+                                        setActiveStep(2); // Go to next step
+                                    }}
+                                >
+                                    Use This List <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
 
             <Toaster toasts={toasts} removeToast={removeToast} />
         </div>

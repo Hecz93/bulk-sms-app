@@ -5,7 +5,7 @@ import { Upload, FileType, CheckCircle, AlertCircle, Link, FileSpreadsheet, Load
 import { Card, CardContent, Button, Input, Label } from './ui-base';
 import { cn } from '../lib/utils';
 
-export function FileUpload({ onDataLoaded, onSuccess, onFileName }) {
+export function FileUpload({ onDataLoaded, onSuccess, onFileName, onPreview }) {
     const [activeTab, setActiveTab] = useState('file'); // 'file' or 'link'
     const [isDragging, setIsDragging] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -89,9 +89,12 @@ export function FileUpload({ onDataLoaded, onSuccess, onFileName }) {
         }
     };
 
-    const importGoogleSheet = async () => {
-        if (!gsLink.includes('docs.google.com/spreadsheets')) {
-            setError("Please enter a valid Google Sheets link.");
+    const importFromLink = async () => {
+        const isExcelLink = gsLink.match(/\.(xlsx|xls|ods)$/) || gsLink.includes('download') || gsLink.includes('excel');
+        const isGoogleSheet = gsLink.includes('docs.google.com/spreadsheets');
+
+        if (!isGoogleSheet && !isExcelLink) {
+            setError("Please enter a valid Google Sheets or Excel (.xlsx) web link.");
             return;
         }
 
@@ -99,29 +102,37 @@ export function FileUpload({ onDataLoaded, onSuccess, onFileName }) {
         setIsProcessing(true);
 
         try {
-            // Extract the spreadsheet ID
-            const matches = gsLink.match(/\/d\/(.+?)\//);
-            if (!matches) throw new Error("Invalid Google Sheets URL format.");
-
-            const sheetId = matches[1];
-            // Fetch as CSV export (works for public sheets)
-            const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-
-            const response = await fetch(exportUrl);
-            if (!response.ok) throw new Error("Spreadsheet not found or not public. Ensure 'Anyone with the link' can view.");
-
-            const csvText = await response.text();
-            Papa.parse(csvText, {
-                header: true,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    setIsProcessing(false);
-                    processData(results.data, "Google Sheet");
-                }
-            });
+            if (isGoogleSheet) {
+                const matches = gsLink.match(/\/d\/(.+?)\//);
+                if (!matches) throw new Error("Invalid Google Sheets URL format.");
+                const sheetId = matches[1];
+                const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+                const response = await fetch(exportUrl);
+                if (!response.ok) throw new Error("Spreadsheet not found or not public.");
+                const csvText = await response.text();
+                Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        setIsProcessing(false);
+                        processData(results.data, "Google Sheet");
+                    }
+                });
+            } else {
+                // Direct Excel Link
+                const response = await fetch(gsLink);
+                if (!response.ok) throw new Error("Failed to reach the Excel file. Link might be private or broken.");
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                setIsProcessing(false);
+                processData(jsonData, "Cloud Excel File");
+            }
         } catch (err) {
             setIsProcessing(false);
-            setError(err.message || "Failed to fetch Google Sheet. Make sure it is public.");
+            setError(err.message || "Failed to fetch link. Ensure it is public.");
         }
     };
 
@@ -162,7 +173,7 @@ export function FileUpload({ onDataLoaded, onSuccess, onFileName }) {
                     )}
                 >
                     <div className="flex items-center justify-center gap-2">
-                        <Link className="w-3.5 h-3.5" /> Google Sheets
+                        <Link className="w-3.5 h-3.5" /> Spreadsheet Link
                     </div>
                 </button>
             </div>
@@ -222,41 +233,61 @@ export function FileUpload({ onDataLoaded, onSuccess, onFileName }) {
                 ) : (
                     <div className="space-y-4 py-2">
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Google Sheet URL</Label>
+                            <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Google Sheets or Excel Link</Label>
                             <Input
-                                placeholder="https://docs.google.com/spreadsheets/d/..."
+                                placeholder="Paste link here..."
                                 value={gsLink}
                                 onChange={(e) => setGsLink(e.target.value)}
                                 className="h-12 rounded-xl bg-slate-50/50 border-slate-200 focus:ring-blue-500/20"
                             />
                             <p className="text-[10px] text-slate-400 italic">
-                                Note: Sheet must be shared as "Anyone with the link can view"
+                                Note: File must be shared as "Anyone with the link can view/download"
                             </p>
                         </div>
                         <Button
                             className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-100 flex gap-2"
-                            onClick={importGoogleSheet}
+                            onClick={importFromLink}
                             disabled={isProcessing || !gsLink}
                         >
                             {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
-                            Import from Google Sheets
+                            Import from Link
                         </Button>
                         {error && <p className="text-xs text-red-500 text-center font-medium bg-red-50 p-2 rounded-lg border border-red-100">{error}</p>}
                     </div>
                 )}
 
                 {success && !isProcessing && (
-                    <div className="mt-4 flex items-center justify-between p-3 bg-blue-50/50 text-blue-700 rounded-xl text-xs border border-blue-100/50">
-                        <div className="flex items-center gap-2">
-                            <FileType className="w-4 h-4" />
-                            <span className="font-bold">Contacts loaded successfully</span>
+                    <div className="mt-4 flex flex-col gap-2 p-3 bg-blue-50/50 rounded-xl border border-blue-100/50">
+                        <div className="flex items-center justify-between text-blue-700 text-xs">
+                            <div className="flex items-center gap-2">
+                                <FileType className="w-4 h-4" />
+                                <span className="font-bold">Contacts Loaded</span>
+                            </div>
+                            <button
+                                onClick={() => { setSuccess(null); setError(null); onDataLoaded([]); }}
+                                className="text-blue-800 font-bold hover:underline"
+                            >
+                                Clear
+                            </button>
                         </div>
-                        <button
-                            onClick={() => { setSuccess(null); setError(null); onDataLoaded([]); }}
-                            className="text-blue-800 font-bold hover:underline"
-                        >
-                            Clear
-                        </button>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onPreview}
+                                className="flex-1 h-8 text-[10px] font-bold border-blue-200 text-blue-700 bg-white hover:bg-blue-50"
+                            >
+                                <Eye className="w-3 h-3 mr-1" /> View Contacts
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSuccess(null)}
+                                className="h-8 text-[10px] text-slate-400"
+                            >
+                                Dismiss
+                            </Button>
+                        </div>
                     </div>
                 )}
             </CardContent>
