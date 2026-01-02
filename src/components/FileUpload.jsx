@@ -4,7 +4,7 @@ import { Upload, FileType, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from './ui-base';
 import { cn } from '../lib/utils';
 
-export function FileUpload({ onDataLoaded }) {
+export function FileUpload({ onDataLoaded, onSuccess }) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
@@ -37,8 +37,14 @@ export function FileUpload({ onDataLoaded }) {
                 } else if (results.data.length === 0) {
                     setError("CSV file is empty.");
                 } else {
-                    setSuccess(`Successfully loaded ${results.data.length} contacts.`);
-                    onDataLoaded(results.data);
+                    const filteredData = results.data; // Assuming filteredData is meant to be results.data if no specific filtering logic is provided
+                    if (filteredData.length > 0) {
+                        onDataLoaded(filteredData);
+                        if (onSuccess) onSuccess(`Successfully loaded ${filteredData.length} contacts`);
+                    } else {
+                        setSuccess(`Successfully loaded ${results.data.length} contacts.`);
+                        onDataLoaded(results.data);
+                    }
                 }
             },
             error: (err) => {

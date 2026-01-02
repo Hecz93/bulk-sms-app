@@ -4,8 +4,10 @@ import { MessageEditor } from './MessageEditor';
 import { SendingProgress } from './SendingProgress';
 import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle } from './ui-base';
 import { getProvider, PROVIDERS } from '../lib/sms-providers';
-import { Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { normalizePhoneNumber } from '../lib/phone-utils';
+import { Toaster, useToasts } from './Toaster';
+import { Calendar } from 'lucide-react';
 
 export function Dashboard() {
     // Data State
@@ -31,7 +33,16 @@ export function Dashboard() {
     const [testPhoneNumber, setTestPhoneNumber] = useState('');
     const [isSendingTest, setIsSendingTest] = useState(false);
 
+    // Scheduling State
+    const [scheduledTime, setScheduledTime] = useState('');
+    const [isWaitingForSchedule, setIsWaitingForSchedule] = useState(false);
+    const [countdown, setCountdown] = useState(null);
+
+    // Toast Hook
+    const { toasts, addToast, removeToast } = useToasts();
+
     const stopRef = useRef(false);
+    const scheduleTimerRef = useRef(null);
 
     const columns = csvData.length > 0 ? Object.keys(csvData[0]) : [];
 
@@ -119,17 +130,77 @@ export function Dashboard() {
             if (!confirm) return;
         }
 
-        setIsSending(true);
-        stopRef.current = false;
-
-        // Reset progress if starting fresh? Or continue? Let's reset for now.
-        if (progress.sent + progress.failed === csvData.length) {
-            setProgress({ sent: 0, failed: 0 });
-            setLogs([]);
+        const provider = getProvider(providerType);
+        if (!provider) {
+            alert("Selected provider not found.");
+            return;
         }
 
-        const provider = getProvider(providerType);
-        addLog(`Starting bulk send using ${providerType.toUpperCase()}...`);
+        // Handle Scheduling
+        if (scheduledTime) {
+            const now = new Date();
+            const targetTime = new Date(scheduledTime);
+
+            if (targetTime > now) {
+                const diff = targetTime.getTime() - now.getTime();
+
+                // Max 1 week restriction
+                const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+                if (diff > oneWeekMs) {
+                    alert("You can only schedule up to 1 week in advance.");
+                    return;
+                }
+
+                setIsWaitingForSchedule(true);
+                addLog(`Message sending scheduled for ${targetTime.toLocaleString()}`, 'warning');
+                addToast(`Sending scheduled for ${targetTime.toLocaleTimeString()}`, 'info');
+
+                // Countdown logic
+                const timer = setInterval(() => {
+                    const remaining = targetTime.getTime() - new Date().getTime();
+                    if (remaining <= 0) {
+                        clearInterval(timer);
+                        setCountdown(null);
+                        setIsWaitingForSchedule(false);
+                        executeSending(provider);
+                    } else {
+                        const seconds = Math.ceil(remaining / 1000);
+                        const mins = Math.floor(seconds / 60);
+                        const secs = seconds % 60;
+                        setCountdown(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
+                    }
+                }, 1000);
+                scheduleTimerRef.current = timer; // Store timer ID
+
+                // Store timer so we can clear it if stopped
+                stopRef.current = false;
+                const checkStop = setInterval(() => {
+                    if (stopRef.current) {
+                        clearInterval(timer);
+                        clearInterval(checkStop);
+                        setIsWaitingForSchedule(false);
+                        setCountdown(null);
+                        addLog("Scheduled sending cancelled.", "error");
+                        addToast("Scheduling cancelled", "error");
+                    }
+                }, 500);
+
+                return;
+            } else {
+                addLog("Scheduled time is in the past. Starting immediately.", 'warning');
+            }
+        }
+
+        executeSending(provider);
+    };
+
+    const executeSending = async (provider) => {
+        setIsSending(true);
+        stopRef.current = false;
+        setProgress({ sent: 0, failed: 0 });
+        setLogs([]);
+        addLog("Starting bulk SMS campaign...", 'info');
+        addToast("Starting campaign...", "info");
 
         // Iterate!
         // We skip already "processed" items if we want resume support, 
@@ -147,13 +218,16 @@ export function Dashboard() {
 
             // Try to find a phone column
             const phoneKey = Object.keys(row).find(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('mobile'));
-            const to = phoneKey ? row[phoneKey] : null;
+            const rawPhone = phoneKey ? row[phoneKey] : null;
 
-            if (!to) {
+            if (!rawPhone) {
                 addLog(`Row ${i + 1}: No phone number found. Skipping.`, 'error');
                 setProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
                 continue;
             }
+
+            // Normalize phone number to E.164 format
+            const to = normalizePhoneNumber(rawPhone);
 
             try {
                 // Tello Anti-Ban: "Human" Random Delay (45s to 90s)
@@ -173,21 +247,21 @@ export function Dashboard() {
                 const result = await provider.send(to, message, apiConfig);
 
                 if (result.success) {
-                    addLog(`Sent to ${to} (ID: ${result.id})`);
                     setProgress(prev => ({ ...prev, sent: prev.sent + 1 }));
+                    addLog(`✓ Sent to ${to} (ID: ${result.id})`, 'info');
                 } else {
-                    addLog(`Failed to ${to}: ${result.error}`, 'error');
                     setProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
+                    addLog(`✗ Failed for ${to}: ${result.error}`, 'error');
                 }
-
             } catch (err) {
-                addLog(`System Error on row ${i + 1}: ${err.message}`, 'error');
                 setProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
+                addLog(`✗ Error for ${to}: ${err.message}`, 'error');
             }
         }
 
         setIsSending(false);
         addLog("Batch processing finished.");
+        addToast("Campaign finished!", "success");
     };
 
     const sendTestMessage = async () => {
@@ -201,7 +275,10 @@ export function Dashboard() {
         }
 
         setIsSendingTest(true);
-        addLog(`Sending test message to ${testPhoneNumber}...`, 'info');
+
+        // Normalize phone number to E.164 format
+        const normalizedPhone = normalizePhoneNumber(testPhoneNumber);
+        addLog(`Sending test message to ${normalizedPhone}...`, 'info');
 
         try {
             // Use first row of CSV data, or empty object if no CSV
@@ -209,15 +286,18 @@ export function Dashboard() {
             const message = interpolate(template, testRow);
 
             const provider = getProvider(providerType);
-            const result = await provider.send(testPhoneNumber, message, apiConfig);
+            const result = await provider.send(normalizedPhone, message, apiConfig);
 
             if (result.success) {
-                addLog(`✓ Test message sent successfully to ${testPhoneNumber} (ID: ${result.id})`, 'info');
+                addLog(`✓ Test message sent successfully to ${normalizedPhone} (ID: ${result.id})`, 'info');
+                addToast("Test message sent!", "success");
             } else {
                 addLog(`✗ Test message failed: ${result.error}`, 'error');
+                addToast("Test message failed", "error");
             }
         } catch (err) {
             addLog(`✗ Test message error: ${err.message}`, 'error');
+            addToast("Test message error", "error");
         } finally {
             setIsSendingTest(false);
         }
@@ -225,6 +305,14 @@ export function Dashboard() {
 
     const stopSending = () => {
         stopRef.current = true;
+        if (isWaitingForSchedule && scheduleTimerRef.current) {
+            clearInterval(scheduleTimerRef.current);
+            scheduleTimerRef.current = null;
+            setIsWaitingForSchedule(false);
+            setCountdown(null);
+            addLog("Scheduled sending cancelled by user.", "warning");
+            addToast("Scheduling cancelled", "error");
+        }
     };
 
     return (
@@ -238,8 +326,8 @@ export function Dashboard() {
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                            <span className={cn("w-2 h-2 rounded-full", isSending ? "bg-green-500 animate-pulse" : "bg-slate-400")}></span>
-                            {isSending ? "Active" : "Ready"}
+                            <span className={cn("w-2 h-2 rounded-full", isSending || isWaitingForSchedule ? "bg-green-500 animate-pulse" : "bg-slate-400")}></span>
+                            {isSending ? "Active" : isWaitingForSchedule ? `Scheduled (${countdown || '...'})` : "Ready"}
                         </div>
                     </div>
                 </div>
@@ -251,7 +339,7 @@ export function Dashboard() {
                 <div className="lg:col-span-7 space-y-6">
                     <section>
                         <h2 className="text-lg font-semibold mb-4 text-slate-800">1. Data Source</h2>
-                        <FileUpload onDataLoaded={setCsvData} />
+                        <FileUpload onDataLoaded={setCsvData} onSuccess={addToast} />
                     </section>
 
                     <section className="h-[500px]">
@@ -390,52 +478,83 @@ export function Dashboard() {
 
                     <section>
                         <h2 className="text-lg font-semibold mb-4 text-slate-800">5. Execution</h2>
+
+                        {/* Scheduling Option */}
+                        <Card className="mb-4">
+                            <CardContent className="pt-6 space-y-4">
+                                <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
+                                    <Calendar className="w-4 h-4" /> Schedule (Optional)
+                                </div>
+                                <div className="space-y-2">
+                                    <Input
+                                        type="datetime-local"
+                                        value={scheduledTime}
+                                        onChange={(e) => setScheduledTime(e.target.value)}
+                                        min={new Date().toISOString().slice(0, 16)}
+                                        max={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                                        disabled={isSending || isWaitingForSchedule}
+                                    />
+                                    <p className="text-xs text-slate-500">
+                                        Max 1 week in advance. Browser must stay open.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         <div className="grid grid-cols-2 gap-4 mb-6">
-                            {!isSending ? (
+                            {!isSending && !isWaitingForSchedule ? (
                                 <Button
-                                    className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
-                                    size="lg"
+                                    className="h-12 text-lg font-bold gap-2 bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 transition-all"
                                     onClick={startSending}
                                     disabled={csvData.length === 0}
                                 >
-                                    <PlayCircle className="w-5 h-5" /> Start Sending
+                                    <PlayCircle className="w-6 h-6" /> Start Campaign
                                 </Button>
                             ) : (
                                 <Button
-                                    className="w-full gap-2"
                                     variant="destructive"
-                                    size="lg"
+                                    className="h-12 text-lg font-bold gap-2 border-b-4 border-red-700 active:border-b-0 active:translate-y-1 transition-all"
                                     onClick={stopSending}
                                 >
-                                    <StopCircle className="w-5 h-5" /> Stop
+                                    {isWaitingForSchedule ? (
+                                        <>
+                                            <StopCircle className="w-6 h-6" /> Cancel Schedule ({countdown})
+                                        </>
+                                    ) : (
+                                        <>
+                                            <StopCircle className="w-6 h-6" /> Stop Sending
+                                        </>
+                                    )}
                                 </Button>
                             )}
 
                             <Button
                                 variant="outline"
-                                size="lg"
-                                className="w-full gap-2"
+                                className="h-12 text-lg font-bold gap-2 border-b-4 border-slate-200 active:border-b-0 active:translate-y-1 transition-all"
                                 onClick={() => {
+                                    setCsvData([]);
                                     setProgress({ sent: 0, failed: 0 });
                                     setLogs([]);
-                                    setCsvData([]);
-                                    setTemplate("");
+                                    addToast("All data cleared", "info");
                                 }}
+                                disabled={isSending || isWaitingForSchedule}
                             >
-                                <RefreshCw className="w-4 h-4" /> Reset
+                                <RefreshCw className="w-6 h-6" /> Clear All
                             </Button>
                         </div>
 
-                        <SendingProgress
-                            total={csvData.length}
-                            sent={progress.sent}
-                            failed={progress.failed}
-                            isSending={isSending}
-                            logs={logs}
-                        />
+                        {(isSending || isWaitingForSchedule) && (
+                            <SendingProgress
+                                progress={progress}
+                                total={csvData.length}
+                                logs={logs}
+                            />
+                        )}
                     </section>
                 </div>
             </main>
+
+            <Toaster toasts={toasts} removeToast={removeToast} />
         </div>
     );
 }
