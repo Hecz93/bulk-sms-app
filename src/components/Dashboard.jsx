@@ -342,7 +342,7 @@ export function Dashboard() {
                         <FileUpload onDataLoaded={setCsvData} onSuccess={addToast} />
                     </section>
 
-                    <section className="h-[500px]">
+                    <section className="min-h-[500px]">
                         <h2 className="text-lg font-semibold mb-4 text-slate-800">2. Compose Message</h2>
                         <MessageEditor
                             template={template}

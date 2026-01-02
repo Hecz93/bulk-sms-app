@@ -137,7 +137,7 @@ export function MessageEditor({ template, setTemplate, columns = [], previewRow 
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-4 bg-slate-100 rounded-b-xl"></div>
 
                         <div className="mt-4 flex flex-col gap-2">
-                            <div className="max-w-[85%] self-end bg-blue-500 text-white rounded-2xl rounded-tr-sm px-4 py-2 text-sm leading-relaxed shadow-sm">
+                            <div className="max-w-[85%] self-end bg-blue-500 text-white rounded-2xl rounded-tr-sm px-4 py-2 text-sm leading-relaxed shadow-sm break-words whitespace-pre-wrap">
                                 {preview || <span className="opacity-50 italic">Start typing...</span>}
                             </div>
                             <div className="text-[10px] text-slate-400 text-right pr-1">
