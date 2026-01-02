@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { MessageEditor } from './MessageEditor';
 import { SendingProgress } from './SendingProgress';
@@ -34,6 +34,47 @@ export function Dashboard() {
     const stopRef = useRef(false);
 
     const columns = csvData.length > 0 ? Object.keys(csvData[0]) : [];
+
+    // Load saved state from localStorage on mount
+    useEffect(() => {
+        const savedConfig = localStorage.getItem('bulksms_apiConfig');
+        if (savedConfig) {
+            try {
+                setApiConfig(JSON.parse(savedConfig));
+            } catch (e) {
+                console.error('Failed to parse saved API config:', e);
+            }
+        }
+
+        const savedProvider = localStorage.getItem('bulksms_providerType');
+        if (savedProvider) setProviderType(savedProvider);
+
+        const savedTestPhone = localStorage.getItem('bulksms_testPhoneNumber');
+        if (savedTestPhone) setTestPhoneNumber(savedTestPhone);
+
+        const savedTemplate = localStorage.getItem('bulksms_template');
+        if (savedTemplate) setTemplate(savedTemplate);
+    }, []);
+
+    // Save apiConfig to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('bulksms_apiConfig', JSON.stringify(apiConfig));
+    }, [apiConfig]);
+
+    // Save providerType to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('bulksms_providerType', providerType);
+    }, [providerType]);
+
+    // Save testPhoneNumber to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('bulksms_testPhoneNumber', testPhoneNumber);
+    }, [testPhoneNumber]);
+
+    // Save template to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('bulksms_template', template);
+    }, [template]);
 
     // Helper to add log
     const addLog = (message, type = 'info') => {
