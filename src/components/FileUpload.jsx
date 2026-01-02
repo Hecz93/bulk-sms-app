@@ -197,7 +197,7 @@ export function FileUpload({ onDataLoaded, onSuccess, onFileName, onPreview }) {
                             ref={fileInputRef}
                             type="file"
                             className="hidden"
-                            accept=".csv, .xlsx, .xls, .tsv, .txt, .ods"
+                            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.tsv,text/tab-separated-values,.txt,text/plain,.ods,application/vnd.oasis.opendocument.spreadsheet"
                             onChange={handleChange}
                         />
 
@@ -209,23 +209,27 @@ export function FileUpload({ onDataLoaded, onSuccess, onFileName, onPreview }) {
                             ) : error ? (
                                 <AlertCircle className="w-10 h-10 text-red-500" />
                             ) : (
-                                <div className="bg-blue-50 p-3 rounded-2xl">
+                                <div className="bg-blue-50 p-3 rounded-2xl group-hover:scale-110 transition-transform">
                                     <FileSpreadsheet className="w-8 h-8 text-blue-600" />
                                 </div>
                             )}
 
                             <div className="space-y-1">
                                 <p className="text-sm font-bold text-slate-900">
-                                    {isProcessing ? "Processing..." : success ? success : error ? error : "Tap to browse files"}
+                                    {isProcessing ? "Processing..." : success ? "File Selected!" : error ? error : "Tap to browse phone storage"}
                                 </p>
-                                <p className="text-xs text-slate-500 max-w-[200px]">
-                                    Supports CSV, Excel (XLSX), and TSV formats
-                                </p>
+                                <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                                    {['CSV', 'EXCEL', 'TSV'].map(fmt => (
+                                        <span key={fmt} className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-bold rounded-full border border-slate-200">
+                                            {fmt}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
 
                             {!success && !isProcessing && (
-                                <Button size="sm" className="mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 text-[11px] font-bold shadow-md shadow-blue-100 h-9">
-                                    Choose File
+                                <Button size="sm" className="mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 text-[11px] font-bold shadow-md shadow-blue-100 h-10 animate-bounce-subtle">
+                                    Choose Allowed File
                                 </Button>
                             )}
                         </div>
