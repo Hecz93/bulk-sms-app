@@ -17,7 +17,9 @@ export function Dashboard() {
     const [apiConfig, setApiConfig] = useState({
         accountSid: '',
         authToken: '',
-        fromNumber: ''
+        fromNumber: '',
+        apiKey: '',
+        deviceId: ''
     });
 
     // Sending State
@@ -35,9 +37,19 @@ export function Dashboard() {
         setLogs(prev => [{ time, message, type }, ...prev]);
     };
 
-    // Message Interpolation
+    // Message Interpolation with SPINTAX Support
     const interpolate = (tpl, row) => {
         let msg = tpl;
+
+        // 1. Process Spintax: {Hi|Hello|Hey} -> Random selection
+        // Regex looks for braces containing pipe | characters
+        // We use a loop to handle nested/multiple spintax blocks
+        msg = msg.replace(/\{([^{}]+?\|[^{}]+?)\}/g, (match, content) => {
+            const options = content.split('|');
+            return options[Math.floor(Math.random() * options.length)];
+        });
+
+        // 2. Process Variables: {{Name}} -> Value
         for (const [key, value] of Object.entries(row)) {
             // Regex to replace {{Key}} case-insensitive
             const regex = new RegExp(`{{${key}}}`, 'gi');
@@ -55,6 +67,11 @@ export function Dashboard() {
         if (!template.trim()) {
             alert("Please enter a message template.");
             return;
+        }
+
+        if (csvData.length > 500) {
+            const confirm = window.confirm("⚠️ WARNING: sending > 500 messages in one day is risky on personal plans (like Tello/Hello Mobile). You might get banned. Are you sure you want to proceed?");
+            if (!confirm) return;
         }
 
         setIsSending(true);
@@ -94,8 +111,19 @@ export function Dashboard() {
             }
 
             try {
-                // Rate limit shim (1 sec delay)
-                await new Promise(r => setTimeout(r, 1000));
+                // Tello Anti-Ban: "Human" Random Delay (45s to 90s)
+                // Only skip delay for the very first message
+                if (i > startIndex) {
+                    const delayMs = Math.floor(Math.random() * (90000 - 45000 + 1) + 45000);
+                    addLog(`Waiting ${Math.round(delayMs / 1000)}s to look human...`, 'warning');
+                    await new Promise(r => setTimeout(r, delayMs));
+                }
+
+                // Double check if user stopped during the long delay
+                if (stopRef.current) {
+                    addLog("Sending stopped by user.", "warning");
+                    break;
+                }
 
                 const result = await provider.send(to, message, apiConfig);
 
@@ -154,6 +182,7 @@ export function Dashboard() {
                             template={template}
                             setTemplate={setTemplate}
                             columns={columns.filter(c => c !== "")}
+                            previewRow={csvData.length > 0 ? csvData[0] : {}}
                         />
                     </section>
                 </div>
@@ -178,8 +207,32 @@ export function Dashboard() {
                                     >
                                         <option value={PROVIDERS.MOCK}>Mock (Test Mode - Free)</option>
                                         <option value={PROVIDERS.TWILIO}>Twilio (Cloud API)</option>
+                                        <option value={PROVIDERS.TEXTBEE}>TextBee (Android Gateway - FREE)</option>
                                     </select>
                                 </div>
+
+                                {providerType === PROVIDERS.TEXTBEE && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label>TextBee API Key</Label>
+                                            <Input
+                                                type="password"
+                                                placeholder="Your API Key from TextBee Dashboard"
+                                                value={apiConfig.apiKey}
+                                                onChange={(e) => setApiConfig({ ...apiConfig, apiKey: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Device ID</Label>
+                                            <Input
+                                                placeholder="e.g. 65a4c..."
+                                                value={apiConfig.deviceId}
+                                                onChange={(e) => setApiConfig({ ...apiConfig, deviceId: e.target.value })}
+                                            />
+                                            <p className="text-xs text-slate-500">Found in TextBee App "Devices" tab</p>
+                                        </div>
+                                    </>
+                                )}
 
                                 {providerType === PROVIDERS.TWILIO && (
                                     <>
