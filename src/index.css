@@ -24,6 +24,33 @@
   .glass {
     @apply bg-zinc-900/60 backdrop-blur-xl border border-white/5;
   }
+
+  /* Premium Utilities */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* This .glass class is different from the one above, consider renaming or merging if intended to be the same concept */
+  .glass-alt {
+    /* Renamed to avoid conflict with existing .glass */
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .premium-shadow {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    /* Corrected 'shadow' to 'box-shadow' */
+  }
+
+  .step-transition {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 
 /* Custom animations if needed */
@@ -48,6 +75,7 @@
     opacity: 0;
     transform: translateX(100%);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);

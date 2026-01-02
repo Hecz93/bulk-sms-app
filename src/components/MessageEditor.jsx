@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent, Label, Button } from './ui-ba
 import { Plus, Wand2, Eye, AlertTriangle } from 'lucide-react';
 
 export function MessageEditor({ template, setTemplate, columns = [], previewRow = {} }) {
+    const [activeTab, setActiveTab] = useState('edit'); // 'edit' or 'preview'
 
     // Helper to insert text at cursor position
     const insertText = (text) => {
@@ -74,10 +75,35 @@ export function MessageEditor({ template, setTemplate, columns = [], previewRow 
                 </div>
             </CardHeader>
 
+            {/* Mobile Tab Toggle */}
+            <div className="lg:hidden flex border-b border-slate-100 bg-slate-50/30">
+                <button
+                    onClick={() => setActiveTab('edit')}
+                    className={cn(
+                        "flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-all border-b-2",
+                        activeTab === 'edit' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+                    )}
+                >
+                    Edit Template
+                </button>
+                <button
+                    onClick={() => setActiveTab('preview')}
+                    className={cn(
+                        "flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-all border-b-2",
+                        activeTab === 'preview' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"
+                    )}
+                >
+                    Live Preview
+                </button>
+            </div>
+
             <CardContent className="flex-1 flex flex-col lg:flex-row gap-0 p-0">
 
                 {/* Editor Section */}
-                <div className="flex-1 p-4 flex flex-col gap-4 border-b lg:border-b-0 lg:border-r border-slate-100">
+                <div className={cn(
+                    "flex-1 p-4 flex flex-col gap-4 border-b lg:border-b-0 lg:border-r border-slate-100",
+                    activeTab !== 'edit' && "hidden lg:flex"
+                )}>
                     <div className="flex items-center justify-between">
                         <Label htmlFor="message-input" className="text-xs font-medium uppercase tracking-wider text-slate-500">
                             Template
@@ -127,7 +153,10 @@ export function MessageEditor({ template, setTemplate, columns = [], previewRow 
                 </div>
 
                 {/* Preview Section */}
-                <div className="lg:w-[35%] bg-slate-50 p-4 flex flex-col gap-3">
+                <div className={cn(
+                    "lg:w-[35%] bg-slate-50/50 p-4 flex flex-col gap-3",
+                    activeTab !== 'preview' && "hidden lg:flex"
+                )}>
                     <Label className="text-xs font-medium uppercase tracking-wider text-slate-500 flex items-center gap-2">
                         <Eye className="w-3 h-3" /> Live Preview (Row 1)
                     </Label>

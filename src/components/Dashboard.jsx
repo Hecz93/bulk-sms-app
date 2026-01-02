@@ -46,6 +46,9 @@ export function Dashboard() {
     const [sendingMode, setSendingMode] = useState('browser'); // 'browser' or 'cloud'
     const [isInitializingDb, setIsInitializingDb] = useState(false);
 
+    // Mobile Stepped UI State
+    const [activeStep, setActiveStep] = useState(1);
+
     const stopRef = useRef(false);
     const scheduleTimerRef = useRef(null);
 
@@ -403,305 +406,399 @@ export function Dashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
+        <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-24 lg:pb-8">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+            <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Send className="w-6 h-6 text-blue-600" />
-                        <h1 className="text-xl font-bold tracking-tight">BulkSMS <span className="text-slate-400 font-normal">Pro</span></h1>
+                        <div className="bg-blue-600 p-1.5 rounded-lg shadow-blue-200 shadow-lg">
+                            <Send className="w-5 h-5 text-white" />
+                        </div>
+                        <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
+                            BulkSMS<span className="text-blue-600">Pro</span>
+                        </h1>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                            <span className={cn("w-2 h-2 rounded-full", isSending || isWaitingForSchedule ? "bg-green-500 animate-pulse" : "bg-slate-400")}></span>
-                            {isSending ? "Active" : isWaitingForSchedule ? `Scheduled (${countdown || '...'})` : "Ready"}
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+                            <span className={cn(
+                                "w-2 h-2 rounded-full shadow-sm",
+                                isSending || isWaitingForSchedule ? "bg-green-500 animate-pulse" : "bg-slate-400"
+                            )}></span>
+                            {isSending ? "Active" : isWaitingForSchedule ? "Queued" : "Standby"}
                         </div>
                     </div>
+                </div>
+
+                {/* Mobile Progress Tracker */}
+                <div className="lg:hidden px-4 py-3 bg-white border-t border-slate-100 flex justify-between items-center overflow-x-auto no-scrollbar gap-4">
+                    {[1, 2, 3, 4, 5].map((step) => (
+                        <button
+                            key={step}
+                            onClick={() => setActiveStep(step)}
+                            className={cn(
+                                "flex-shrink-0 flex items-center gap-2 transition-all duration-300",
+                                activeStep === step ? "opacity-100 scale-100" : "opacity-40 scale-95"
+                            )}
+                        >
+                            <div className={cn(
+                                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                activeStep === step ? "bg-blue-600 text-white shadow-md shadow-blue-100" : "bg-slate-200 text-slate-600"
+                            )}>
+                                {step}
+                            </div>
+                            <span className={cn(
+                                "text-[10px] whitespace-nowrap font-bold uppercase tracking-wider",
+                                activeStep === step ? "text-blue-600" : "text-slate-500"
+                            )}>
+                                {step === 1 ? "Data" : step === 2 ? "Write" : step === 3 ? "Test" : step === 4 ? "Config" : "Final"}
+                            </span>
+                        </button>
+                    ))}
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <main className="max-w-7xl mx-auto px-4 py-6 md:py-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
 
-                {/* Left Column: Data & Editor */}
-                <div className="lg:col-span-7 space-y-6">
-                    <section>
-                        <h2 className="text-lg font-semibold mb-4 text-slate-800">1. Data Source</h2>
-                        <FileUpload
-                            onDataLoaded={setCsvData}
-                            onSuccess={addToast}
-                            onFileName={setFileName}
-                        />
-                        {fileName && (
-                            <div className="mt-2 text-xs text-slate-500 flex items-center gap-1">
-                                <Send className="w-3 h-3" /> Currently loaded: <span className="font-semibold text-slate-700">{fileName}</span> ({csvData.length} records)
+                    {/* Left Column (Desktop) / Stepped Flow (Mobile) */}
+                    <div className={cn(
+                        "lg:col-span-7 space-y-6",
+                        activeStep !== 1 && activeStep !== 2 && "hidden lg:block"
+                    )}>
+                        <section className={cn(activeStep !== 1 && "hidden lg:block")}>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
+                                    Import Contacts
+                                </h2>
                             </div>
-                        )}
-                    </section>
-
-                    <section className="min-h-[500px]">
-                        <h2 className="text-lg font-semibold mb-4 text-slate-800">2. Compose Message</h2>
-                        <MessageEditor
-                            template={template}
-                            setTemplate={setTemplate}
-                            columns={columns.filter(c => c !== "")}
-                            previewRow={csvData.length > 0 ? csvData[0] : {}}
-                        />
-                    </section>
-                </div>
-
-                {/* Right Column: Settings & Progress */}
-                <div className="lg:col-span-5 space-y-6">
-                    {/* Test Message Section */}
-                    <section>
-                        <h2 className="text-lg font-semibold mb-4 text-slate-800">3. Test Message</h2>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <TestTube className="w-4 h-4" /> Send Test SMS
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Test Phone Number</Label>
-                                    <Input
-                                        type="tel"
-                                        placeholder="+15551234567"
-                                        value={testPhoneNumber}
-                                        onChange={(e) => setTestPhoneNumber(e.target.value)}
-                                        disabled={isSendingTest}
-                                    />
-                                    <p className="text-xs text-slate-500">
-                                        {csvData.length > 0
-                                            ? "Will use first row of CSV data for variables"
-                                            : "Variables will show as placeholders (no CSV loaded)"}
-                                    </p>
+                            <FileUpload
+                                onDataLoaded={setCsvData}
+                                onSuccess={addToast}
+                                onFileName={setFileName}
+                            />
+                            {fileName && (
+                                <div className="mt-3 p-2 bg-blue-50/50 rounded-lg border border-blue-100/50 text-[11px] text-slate-500 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                    Loaded: <span className="font-bold text-slate-700 underline truncate">{fileName}</span> ({csvData.length} rows)
                                 </div>
-                                <Button
-                                    className="w-full gap-2"
-                                    onClick={sendTestMessage}
-                                    disabled={isSendingTest || !template.trim()}
-                                >
-                                    {isSendingTest ? (
-                                        <>
-                                            <RefreshCw className="w-4 h-4 animate-spin" /> Sending...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <TestTube className="w-4 h-4" /> Send Test
-                                        </>
-                                    )}
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </section>
+                            )}
+                        </section>
 
-                    <section>
-                        <h2 className="text-lg font-semibold mb-4 text-slate-800">4. Configuration</h2>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <Settings className="w-4 h-4" /> Provider Settings
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Service Provider</Label>
-                                    <select
-                                        className="w-full flex h-10 items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={providerType}
-                                        onChange={(e) => setProviderType(e.target.value)}
+                        <section className={cn("min-h-[500px]", activeStep !== 2 && "hidden lg:block")}>
+                            <h2 className="text-lg font-bold mb-4 text-slate-800 flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center text-xs">2</span>
+                                Compose Message
+                            </h2>
+                            <MessageEditor
+                                template={template}
+                                setTemplate={setTemplate}
+                                columns={columns.filter(c => c !== "")}
+                                previewRow={csvData.length > 0 ? csvData[0] : {}}
+                            />
+                        </section>
+                    </div>
+
+                    {/* Right Column (Desktop) / Stepped Flow (Mobile) */}
+                    <div className={cn(
+                        "lg:col-span-5 space-y-6",
+                        activeStep !== 3 && activeStep !== 4 && activeStep !== 5 && "hidden lg:block"
+                    )}>
+                        {/* Test Message Section */}
+                        <section className={cn(activeStep !== 3 && "hidden lg:block")}>
+                            <h2 className="text-lg font-bold mb-4 text-slate-800 flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center text-xs">3</span>
+                                Verification
+                            </h2>
+                            <Card className="border-slate-200 shadow-sm overflow-hidden">
+                                <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
+                                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                        <TestTube className="w-4 h-4 text-amber-500" /> Send Single Test
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4 pt-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Test Recipient</Label>
+                                        <Input
+                                            type="tel"
+                                            placeholder="+1 555-000-0000"
+                                            className="h-11 shadow-inner bg-slate-50/50"
+                                            value={testPhoneNumber}
+                                            onChange={(e) => setTestPhoneNumber(e.target.value)}
+                                            disabled={isSendingTest}
+                                        />
+                                    </div>
+                                    <Button
+                                        className="w-full h-11 bg-slate-900 text-white font-bold rounded-xl active:scale-95 transition-all shadow-lg shadow-slate-200"
+                                        onClick={sendTestMessage}
+                                        disabled={isSendingTest || !template.trim()}
                                     >
-                                        <option value={PROVIDERS.MOCK}>Mock (Test Mode - Free)</option>
-                                        <option value={PROVIDERS.TWILIO}>Twilio (Cloud API)</option>
-                                        <option value={PROVIDERS.TEXTBEE}>TextBee (Android Gateway - FREE)</option>
-                                    </select>
-                                </div>
+                                        {isSendingTest ? (
+                                            <><RefreshCw className="w-4 h-4 animate-spin" /> Processing...</>
+                                        ) : (
+                                            <><Send className="w-4 h-4" /> Send Test Message</>
+                                        )}
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        </section>
 
-                                {providerType === PROVIDERS.TEXTBEE && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label>TextBee API Key</Label>
-                                            <Input
-                                                type="password"
-                                                placeholder="Your API Key from TextBee Dashboard"
-                                                value={apiConfig.apiKey}
-                                                onChange={(e) => setApiConfig({ ...apiConfig, apiKey: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Device ID</Label>
-                                            <Input
-                                                placeholder="e.g. 65a4c..."
-                                                value={apiConfig.deviceId}
-                                                onChange={(e) => setApiConfig({ ...apiConfig, deviceId: e.target.value })}
-                                            />
-                                            <p className="text-xs text-slate-500">Found in TextBee App "Devices" tab</p>
-                                        </div>
-                                    </>
-                                )}
+                        <section className={cn(activeStep !== 4 && "hidden lg:block")}>
+                            <h2 className="text-lg font-bold mb-4 text-slate-800 flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-700 flex items-center justify-center text-xs">4</span>
+                                Service Config
+                            </h2>
+                            <Card className="border-slate-200 shadow-sm">
+                                <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
+                                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                        <Settings className="w-4 h-4 text-slate-500" /> Gateway Provider
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4 pt-4">
+                                    {/* ... rest of config ... */}
+                                    <div className="space-y-2">
+                                        <Label>Service Provider</Label>
+                                        <select
+                                            className="w-full flex h-10 items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={providerType}
+                                            onChange={(e) => setProviderType(e.target.value)}
+                                        >
+                                            <option value={PROVIDERS.MOCK}>Mock (Test Mode - Free)</option>
+                                            <option value={PROVIDERS.TWILIO}>Twilio (Cloud API)</option>
+                                            <option value={PROVIDERS.TEXTBEE}>TextBee (Android Gateway - FREE)</option>
+                                        </select>
+                                    </div>
 
-                                {providerType === PROVIDERS.TWILIO && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label>Account SID</Label>
-                                            <Input
-                                                type="password"
-                                                value={apiConfig.accountSid}
-                                                onChange={(e) => setApiConfig({ ...apiConfig, accountSid: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Auth Token</Label>
-                                            <Input
-                                                type="password"
-                                                value={apiConfig.authToken}
-                                                onChange={(e) => setApiConfig({ ...apiConfig, authToken: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>From Number</Label>
-                                            <Input
-                                                placeholder="+1234567890"
-                                                value={apiConfig.fromNumber}
-                                                onChange={(e) => setApiConfig({ ...apiConfig, fromNumber: e.target.value })}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </section>
-
-                    <section>
-                        <h2 className="text-lg font-semibold mb-4 text-slate-800">5. Execution</h2>
-
-                        {/* Mode Toggle */}
-                        <div className="flex gap-2 mb-4 p-1 bg-slate-100 rounded-lg">
-                            <button
-                                className={cn(
-                                    "flex-1 py-2 text-sm font-bold rounded-md transition-all",
-                                    sendingMode === 'browser' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
-                                )}
-                                onClick={() => setSendingMode('browser')}
-                            >
-                                Browser Mode
-                            </button>
-                            <button
-                                className={cn(
-                                    "flex-1 py-2 text-sm font-bold rounded-md transition-all",
-                                    sendingMode === 'cloud' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
-                                )}
-                                onClick={() => setSendingMode('cloud')}
-                            >
-                                Cloud Mode (Background)
-                            </button>
-                        </div>
-
-                        {sendingMode === 'cloud' && (
-                            <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-[11px] text-blue-700">
-                                <p className="font-bold mb-1">☁️ Cloud Mode enabled</p>
-                                <p>Messages will be sent by Vercel in the background. You can safely close your laptop once launched.</p>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="mt-2 h-7 text-[10px] py-0"
-                                    onClick={initDb}
-                                    disabled={isInitializingDb}
-                                >
-                                    {isInitializingDb ? "Syncing..." : "Initial Sync (Do once)"}
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* Scheduling Option */}
-                        <Card className="mb-4">
-                            <CardContent className="pt-6 space-y-4">
-                                <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
-                                    <Calendar className="w-4 h-4" /> Schedule (Optional)
-                                </div>
-                                <div className="space-y-2">
-                                    <Input
-                                        type="datetime-local"
-                                        value={scheduledTime}
-                                        onChange={(e) => setScheduledTime(e.target.value)}
-                                        min={new Date().toISOString().slice(0, 16)}
-                                        max={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-                                        disabled={isSending || isWaitingForSchedule}
-                                    />
-                                    <p className="text-xs text-slate-500">
-                                        Max 1 week in advance. Browser must stay open.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            {!isSending && !isWaitingForSchedule ? (
-                                <Button
-                                    className="h-12 text-lg font-bold gap-2 bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 transition-all"
-                                    onClick={sendingMode === 'browser' ? startSending : startCloudSending}
-                                    disabled={csvData.length === 0}
-                                >
-                                    <PlayCircle className="w-6 h-6" /> {sendingMode === 'browser' ? 'Start Campaign' : 'Launch to Cloud'}
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="destructive"
-                                    className="h-12 text-lg font-bold gap-2 border-b-4 border-red-700 active:border-b-0 active:translate-y-1 transition-all"
-                                    onClick={stopSending}
-                                >
-                                    {isWaitingForSchedule ? (
+                                    {providerType === PROVIDERS.TEXTBEE && (
                                         <>
-                                            <StopCircle className="w-6 h-6" /> Cancel Schedule ({countdown})
-                                        </>
-                                    ) : (
-                                        <>
-                                            <StopCircle className="w-6 h-6" /> Stop Sending
+                                            <div className="space-y-2">
+                                                <Label>TextBee API Key</Label>
+                                                <Input
+                                                    type="password"
+                                                    placeholder="Your API Key from TextBee Dashboard"
+                                                    value={apiConfig.apiKey}
+                                                    onChange={(e) => setApiConfig({ ...apiConfig, apiKey: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Device ID</Label>
+                                                <Input
+                                                    placeholder="e.g. 65a4c..."
+                                                    value={apiConfig.deviceId}
+                                                    onChange={(e) => setApiConfig({ ...apiConfig, deviceId: e.target.value })}
+                                                />
+                                                <p className="text-xs text-slate-500">Found in TextBee App "Devices" tab</p>
+                                            </div>
                                         </>
                                     )}
-                                </Button>
+
+                                    {providerType === PROVIDERS.TWILIO && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label>Account SID</Label>
+                                                <Input
+                                                    type="password"
+                                                    value={apiConfig.accountSid}
+                                                    onChange={(e) => setApiConfig({ ...apiConfig, accountSid: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Auth Token</Label>
+                                                <Input
+                                                    type="password"
+                                                    value={apiConfig.authToken}
+                                                    onChange={(e) => setApiConfig({ ...apiConfig, authToken: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>From Number</Label>
+                                                <Input
+                                                    placeholder="+1234567890"
+                                                    value={apiConfig.fromNumber}
+                                                    onChange={(e) => setApiConfig({ ...apiConfig, fromNumber: e.target.value })}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </section>
+
+                        <section>
+                            <h2 className="text-lg font-semibold mb-4 text-slate-800">5. Execution</h2>
+
+                            {/* Mode Toggle */}
+                            <div className="flex gap-2 mb-4 p-1 bg-slate-100 rounded-lg">
+                                <button
+                                    className={cn(
+                                        "flex-1 py-2 text-sm font-bold rounded-md transition-all",
+                                        sendingMode === 'browser' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
+                                    )}
+                                    onClick={() => setSendingMode('browser')}
+                                >
+                                    Browser Mode
+                                </button>
+                                <button
+                                    className={cn(
+                                        "flex-1 py-2 text-sm font-bold rounded-md transition-all",
+                                        sendingMode === 'cloud' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
+                                    )}
+                                    onClick={() => setSendingMode('cloud')}
+                                >
+                                    Cloud Mode (Background)
+                                </button>
+                            </div>
+
+                            {sendingMode === 'cloud' && (
+                                <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-[11px] text-blue-700">
+                                    <p className="font-bold mb-1">☁️ Cloud Mode enabled</p>
+                                    <p>Messages will be sent by Vercel in the background. You can safely close your laptop once launched.</p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-2 h-7 text-[10px] py-0"
+                                        onClick={initDb}
+                                        disabled={isInitializingDb}
+                                    >
+                                        {isInitializingDb ? "Syncing..." : "Initial Sync (Do once)"}
+                                    </Button>
+                                </div>
                             )}
 
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg font-bold gap-2 border-b-4 border-slate-200 active:border-b-0 active:translate-y-1 transition-all"
-                                onClick={() => {
-                                    setCsvData([]);
-                                    setProgress({ sent: 0, failed: 0 });
-                                    setLogs([]);
-                                    addToast("All data cleared", "info");
-                                }}
-                                disabled={isSending || isWaitingForSchedule}
-                            >
-                                <RefreshCw className="w-6 h-6" /> Clear All
-                            </Button>
-                        </div>
-
-                        {(isSending || isWaitingForSchedule) && (
-                            <div className="space-y-4">
-                                {isWaitingForSchedule && (
-                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 animate-pulse">
-                                        <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2 mb-1">
-                                            <Calendar className="w-4 h-4" /> UPCOMING CAMPAIGN
-                                        </h3>
-                                        <p className="text-xs text-blue-700">
-                                            Scheduled: <span className="font-bold">{new Date(scheduledTime).toLocaleString()}</span>
-                                        </p>
-                                        <p className="text-xs text-blue-600">
-                                            File: <span className="font-bold">{fileName || "Unknown CSV"}</span> ({csvData.length} contacts)
+                            {/* Scheduling Option */}
+                            <Card className="mb-4">
+                                <CardContent className="pt-6 space-y-4">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
+                                        <Calendar className="w-4 h-4" /> Schedule (Optional)
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Input
+                                            type="datetime-local"
+                                            value={scheduledTime}
+                                            onChange={(e) => setScheduledTime(e.target.value)}
+                                            min={new Date().toISOString().slice(0, 16)}
+                                            max={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                                            disabled={isSending || isWaitingForSchedule}
+                                        />
+                                        <p className="text-xs text-slate-500">
+                                            Max 1 week in advance. Browser must stay open.
                                         </p>
                                     </div>
+                                </CardContent>
+                            </Card>
+
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                {!isSending && !isWaitingForSchedule ? (
+                                    <Button
+                                        className="h-12 text-lg font-bold gap-2 bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 transition-all"
+                                        onClick={sendingMode === 'browser' ? startSending : startCloudSending}
+                                        disabled={csvData.length === 0}
+                                    >
+                                        <PlayCircle className="w-6 h-6" /> {sendingMode === 'browser' ? 'Start Campaign' : 'Launch to Cloud'}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="destructive"
+                                        className="h-12 text-lg font-bold gap-2 border-b-4 border-red-700 active:border-b-0 active:translate-y-1 transition-all"
+                                        onClick={stopSending}
+                                    >
+                                        {isWaitingForSchedule ? (
+                                            <>
+                                                <StopCircle className="w-6 h-6" /> Cancel Schedule ({countdown})
+                                            </>
+                                        ) : (
+                                            <>
+                                                <StopCircle className="w-6 h-6" /> Stop Sending
+                                            </>
+                                        )}
+                                    </Button>
                                 )}
-                                <SendingProgress
-                                    progress={progress}
-                                    total={csvData.length}
-                                    logs={logs}
-                                />
+
+                                <Button
+                                    variant="outline"
+                                    className="h-12 text-lg font-bold gap-2 border-b-4 border-slate-200 active:border-b-0 active:translate-y-1 transition-all"
+                                    onClick={() => {
+                                        setCsvData([]);
+                                        setProgress({ sent: 0, failed: 0 });
+                                        setLogs([]);
+                                        addToast("All data cleared", "info");
+                                    }}
+                                    disabled={isSending || isWaitingForSchedule}
+                                >
+                                    <RefreshCw className="w-6 h-6" /> Clear All
+                                </Button>
                             </div>
-                        )}
-                    </section>
-                </div>
+
+                            {(isSending || isWaitingForSchedule) && (
+                                <div className="space-y-4">
+                                    {isWaitingForSchedule && (
+                                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 animate-pulse">
+                                            <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2 mb-1">
+                                                <Calendar className="w-4 h-4" /> UPCOMING CAMPAIGN
+                                            </h3>
+                                            <p className="text-xs text-blue-700">
+                                                Scheduled: <span className="font-bold">{new Date(scheduledTime).toLocaleString()}</span>
+                                            </p>
+                                            <p className="text-xs text-blue-600">
+                                                File: <span className="font-bold">{fileName || "Unknown CSV"}</span> ({csvData.length} contacts)
+                                            </p>
+                                        </div>
+                                    )}
+                                    <SendingProgress
+                                        progress={progress}
+                                        total={csvData.length}
+                                        logs={logs}
+                                    />
+                                </div>
+                            )}
+                        </section>
+                    </div> {/* End Right Column */}
+                </div> {/* End grid */}
             </main>
+
+            {/* Mobile Sticky Navigation */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-slate-200 px-6 py-4 z-40 flex justify-between items-center shadow-[0_-8px_30px_rgb(0,0,0,0.04)]">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-500 font-bold disabled:opacity-0"
+                    onClick={() => setActiveStep(prev => Math.max(1, prev - 1))}
+                    disabled={activeStep === 1}
+                >
+                    Back
+                </Button>
+
+                <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(s => (
+                        <div
+                            key={s}
+                            className={cn(
+                                "h-1 rounded-full transition-all duration-300",
+                                activeStep === s ? "w-4 bg-blue-600" : "w-1 bg-slate-200"
+                            )}
+                        />
+                    ))}
+                </div>
+
+                {activeStep < 5 ? (
+                    <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full px-6 shadow-md shadow-blue-100"
+                        onClick={() => setActiveStep(prev => Math.min(5, prev + 1))}
+                    >
+                        Next
+                    </Button>
+                ) : (
+                    <Button
+                        size="sm"
+                        className="bg-slate-900 hover:bg-black text-white font-bold rounded-full px-6 shadow-lg active:scale-95"
+                        onClick={sendingMode === 'browser' ? startSending : startCloudSending}
+                        disabled={csvData.length === 0}
+                    >
+                        {sendingMode === 'browser' ? 'Start' : 'Launch'}
+                    </Button>
+                )}
+            </div>
 
             <Toaster toasts={toasts} removeToast={removeToast} />
         </div>
