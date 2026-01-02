@@ -42,6 +42,10 @@ export function Dashboard() {
     // Toast Hook
     const { toasts, addToast, removeToast } = useToasts();
 
+    // Cloud Mode State
+    const [sendingMode, setSendingMode] = useState('browser'); // 'browser' or 'cloud'
+    const [isInitializingDb, setIsInitializingDb] = useState(false);
+
     const stopRef = useRef(false);
     const scheduleTimerRef = useRef(null);
 
@@ -281,6 +285,72 @@ export function Dashboard() {
         addToast("Campaign finished!", "success");
     };
 
+    const startCloudSending = async () => {
+        if (csvData.length === 0 || !template.trim()) {
+            alert("Please upload CSV and enter a template.");
+            return;
+        }
+
+        const confirm = window.confirm("Cloud Mode will send messages in the background even if you close this tab. Continue?");
+        if (!confirm) return;
+
+        setIsSending(true);
+        addToast("Preparing cloud campaign...", "info");
+
+        try {
+            // 1. Prepare all messages
+            const messages = csvData.map(row => {
+                const phoneKey = Object.keys(row).find(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('mobile'));
+                const rawPhone = phoneKey ? row[phoneKey] : null;
+                const to = rawPhone ? normalizePhoneNumber(rawPhone) : null;
+                const content = interpolate(template, row);
+                return { to, content };
+            }).filter(m => m.to);
+
+            // 2. Submit to API
+            const response = await fetch('/api/create-campaign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: fileName || `Campaign ${new Date().toLocaleDateString()}`,
+                    template,
+                    providerType,
+                    providerConfig: apiConfig,
+                    scheduledAt: scheduledTime || new Date().toISOString(),
+                    messages
+                })
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                addToast("Cloud Campaign Launched!", "success");
+                addLog(`Cloud campaign started (ID: ${result.campaignId}). You can close your laptop now.`, 'success');
+                setIsWaitingForSchedule(true); // Treat as scheduled/active
+            } else {
+                throw new Error(result.error || "Failed to create cloud campaign");
+            }
+        } catch (err) {
+            alert(`Cloud Error: ${err.message}`);
+            addLog(`Error: ${err.message}`, 'error');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const initDb = async () => {
+        setIsInitializingDb(true);
+        try {
+            const res = await fetch('/api/init-db');
+            const data = await res.json();
+            if (res.ok) addToast("Database Ready!", "success");
+            else alert(data.error);
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setIsInitializingDb(false);
+        }
+    };
+
     const sendTestMessage = async () => {
         if (!testPhoneNumber.trim()) {
             alert("Please enter a test phone number.");
@@ -505,6 +575,44 @@ export function Dashboard() {
                     <section>
                         <h2 className="text-lg font-semibold mb-4 text-slate-800">5. Execution</h2>
 
+                        {/* Mode Toggle */}
+                        <div className="flex gap-2 mb-4 p-1 bg-slate-100 rounded-lg">
+                            <button
+                                className={cn(
+                                    "flex-1 py-2 text-sm font-bold rounded-md transition-all",
+                                    sendingMode === 'browser' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
+                                )}
+                                onClick={() => setSendingMode('browser')}
+                            >
+                                Browser Mode
+                            </button>
+                            <button
+                                className={cn(
+                                    "flex-1 py-2 text-sm font-bold rounded-md transition-all",
+                                    sendingMode === 'cloud' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
+                                )}
+                                onClick={() => setSendingMode('cloud')}
+                            >
+                                Cloud Mode (Background)
+                            </button>
+                        </div>
+
+                        {sendingMode === 'cloud' && (
+                            <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-[11px] text-blue-700">
+                                <p className="font-bold mb-1">☁️ Cloud Mode enabled</p>
+                                <p>Messages will be sent by Vercel in the background. You can safely close your laptop once launched.</p>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2 h-7 text-[10px] py-0"
+                                    onClick={initDb}
+                                    disabled={isInitializingDb}
+                                >
+                                    {isInitializingDb ? "Syncing..." : "Initial Sync (Do once)"}
+                                </Button>
+                            </div>
+                        )}
+
                         {/* Scheduling Option */}
                         <Card className="mb-4">
                             <CardContent className="pt-6 space-y-4">
@@ -531,10 +639,10 @@ export function Dashboard() {
                             {!isSending && !isWaitingForSchedule ? (
                                 <Button
                                     className="h-12 text-lg font-bold gap-2 bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 transition-all"
-                                    onClick={startSending}
+                                    onClick={sendingMode === 'browser' ? startSending : startCloudSending}
                                     disabled={csvData.length === 0}
                                 >
-                                    <PlayCircle className="w-6 h-6" /> Start Campaign
+                                    <PlayCircle className="w-6 h-6" /> {sendingMode === 'browser' ? 'Start Campaign' : 'Launch to Cloud'}
                                 </Button>
                             ) : (
                                 <Button
