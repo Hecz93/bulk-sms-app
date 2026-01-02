@@ -9,7 +9,8 @@ import { normalizePhoneNumber } from '../lib/phone-utils';
 import { Toaster, useToasts } from './Toaster';
 import {
     Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube, Calendar,
-    Eye, X, Trash2, CheckCircle2, ChevronRight
+    Eye, X, Trash2, CheckCircle2, ChevronRight,
+    ArrowDownToLine, Share, Smartphone
 } from 'lucide-react';
 
 export function Dashboard() {
@@ -18,6 +19,11 @@ export function Dashboard() {
     const [fileName, setFileName] = useState(() => localStorage.getItem('bulksms_fileName') || "");
     const [template, setTemplate] = useState(() => localStorage.getItem('bulksms_template') || "");
     const [showDataPreview, setShowDataPreview] = useState(false);
+
+    // PWA Install State
+    const [deferredPrompt, setDeferredPrompt] = useState(null);
+    const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+    const [isIPhone, setIsIPhone] = useState(false);
 
     // Config State
     const [providerType, setProviderType] = useState(() => localStorage.getItem('bulksms_providerType') || PROVIDERS.MOCK);
@@ -58,6 +64,53 @@ export function Dashboard() {
     const scheduleTimerRef = useRef(null);
 
     const columns = csvData.length > 0 ? Object.keys(csvData[0]) : [];
+
+    // PWA Install Logic
+    useEffect(() => {
+        const handler = (e) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+
+            // Check if dismissed before
+            const dismissed = localStorage.getItem('bulksms_install_dismissed');
+            if (!dismissed) {
+                setShowInstallPrompt(true);
+            }
+        };
+
+        window.addEventListener('beforeinstallprompt', handler);
+
+        // Detect iOS (Safari doesn't support beforeinstallprompt)
+        const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+        if (isiOS && !isStandalone) {
+            setIsIPhone(true);
+            const dismissed = localStorage.getItem('bulksms_install_dismissed');
+            if (!dismissed) {
+                setShowInstallPrompt(true);
+            }
+        }
+
+        return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    const handleInstall = async () => {
+        if (!deferredPrompt) return;
+
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+
+        if (outcome === 'accepted') {
+            setShowInstallPrompt(false);
+        }
+        setDeferredPrompt(null);
+    };
+
+    const dismissInstall = () => {
+        setShowInstallPrompt(false);
+        localStorage.setItem('bulksms_install_dismissed', 'true');
+    };
 
     // Save apiConfig to localStorage whenever it changes
     useEffect(() => {
@@ -891,6 +944,69 @@ export function Dashboard() {
                                 </Button>
                             </div>
                         </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* PWA Install Prompt */}
+            {showInstallPrompt && (
+                <div className="fixed bottom-24 lg:bottom-8 left-4 right-4 z-50 animate-in slide-in-from-bottom-5 duration-500">
+                    <Card className="bg-slate-900 border-slate-800 shadow-2xl overflow-hidden rounded-2xl">
+                        <CardContent className="p-0">
+                            <div className="p-5 flex items-start gap-4">
+                                <div className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-900/40">
+                                    <Smartphone className="w-6 h-6 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-white font-bold text-sm">Install BulkSMS Pro</h3>
+                                    <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
+                                        Install our app to your home screen for a faster, offline-ready experience.
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-slate-500 hover:text-white -mt-1 -mr-2"
+                                    onClick={dismissInstall}
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+
+                            <div className="bg-slate-800/50 p-4 border-t border-slate-800">
+                                {isIPhone ? (
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex items-center gap-2 text-white text-[10px] font-bold uppercase tracking-widest px-2">
+                                            <Share className="w-3 h-3 text-blue-500" /> Instructions for iOS
+                                        </div>
+                                        <p className="text-slate-400 text-[10px] pl-2">
+                                            1. Tap the <span className="text-white font-bold inline-flex items-center gap-1 bg-slate-800 px-1.5 py-0.5 rounded ml-1 mr-1"><Share className="w-3 h-3" /> Share</span> icon below
+                                        </p>
+                                        <p className="text-slate-400 text-[10px] pl-2">
+                                            2. Select <span className="text-white font-bold bg-slate-800 px-1.5 py-0.5 rounded ml-1 mr-1">Add to Home Screen</span>
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="flex-1 h-10 text-slate-400 font-bold hover:text-white"
+                                            onClick={dismissInstall}
+                                        >
+                                            Maybe Later
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 flex gap-2"
+                                            onClick={handleInstall}
+                                        >
+                                            <ArrowDownToLine className="w-4 h-4" /> Install Now
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
                     </Card>
                 </div>
             )}
