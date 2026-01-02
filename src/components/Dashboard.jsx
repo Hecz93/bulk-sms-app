@@ -10,19 +10,20 @@ import { Toaster, useToasts } from './Toaster';
 import { Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube, Calendar } from 'lucide-react';
 
 export function Dashboard() {
-    // Data State
+    // State with localStorage persistence
     const [csvData, setCsvData] = useState([]);
-    const [fileName, setFileName] = useState("");
-    const [template, setTemplate] = useState("");
+    const [fileName, setFileName] = useState(() => localStorage.getItem('bulksms_fileName') || "");
+    const [template, setTemplate] = useState(() => localStorage.getItem('bulksms_template') || "");
 
     // Config State
-    const [providerType, setProviderType] = useState(PROVIDERS.MOCK);
-    const [apiConfig, setApiConfig] = useState({
-        accountSid: '',
-        authToken: '',
-        fromNumber: '',
-        apiKey: '',
-        deviceId: ''
+    const [providerType, setProviderType] = useState(() => localStorage.getItem('bulksms_providerType') || PROVIDERS.MOCK);
+    const [apiConfig, setApiConfig] = useState(() => {
+        const saved = localStorage.getItem('bulksms_apiConfig');
+        const defaultConfig = { accountSid: '', authToken: '', fromNumber: '', apiKey: '', deviceId: '' };
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) { return defaultConfig; }
+        }
+        return defaultConfig;
     });
 
     // Sending State
@@ -31,11 +32,11 @@ export function Dashboard() {
     const [logs, setLogs] = useState([]);
 
     // Test Message State
-    const [testPhoneNumber, setTestPhoneNumber] = useState('');
+    const [testPhoneNumber, setTestPhoneNumber] = useState(() => localStorage.getItem('bulksms_testPhoneNumber') || '');
     const [isSendingTest, setIsSendingTest] = useState(false);
 
     // Scheduling State
-    const [scheduledTime, setScheduledTime] = useState('');
+    const [scheduledTime, setScheduledTime] = useState(() => localStorage.getItem('bulksms_scheduledTime') || '');
     const [isWaitingForSchedule, setIsWaitingForSchedule] = useState(false);
     const [countdown, setCountdown] = useState(null);
 
@@ -53,33 +54,6 @@ export function Dashboard() {
     const scheduleTimerRef = useRef(null);
 
     const columns = csvData.length > 0 ? Object.keys(csvData[0]) : [];
-
-    // Load saved state from localStorage on mount
-    useEffect(() => {
-        const savedConfig = localStorage.getItem('bulksms_apiConfig');
-        if (savedConfig) {
-            try {
-                setApiConfig(JSON.parse(savedConfig));
-            } catch (e) {
-                console.error('Failed to parse saved API config:', e);
-            }
-        }
-
-        const savedProvider = localStorage.getItem('bulksms_providerType');
-        if (savedProvider) setProviderType(savedProvider);
-
-        const savedTestPhone = localStorage.getItem('bulksms_testPhoneNumber');
-        if (savedTestPhone) setTestPhoneNumber(savedTestPhone);
-
-        const savedTemplate = localStorage.getItem('bulksms_template');
-        if (savedTemplate) setTemplate(savedTemplate);
-
-        const savedFileName = localStorage.getItem('bulksms_fileName');
-        if (savedFileName) setFileName(savedFileName);
-
-        const savedScheduledTime = localStorage.getItem('bulksms_scheduledTime');
-        if (savedScheduledTime) setScheduledTime(savedScheduledTime);
-    }, []);
 
     // Save apiConfig to localStorage whenever it changes
     useEffect(() => {
