@@ -1,0 +1,266 @@
+import React, { useState, useRef } from 'react';
+import { FileUpload } from './FileUpload';
+import { MessageEditor } from './MessageEditor';
+import { SendingProgress } from './SendingProgress';
+import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle } from './ui-base';
+import { getProvider, PROVIDERS } from '../lib/sms-providers';
+import { Settings, Send, PlayCircle, StopCircle, RefreshCw } from 'lucide-react';
+import { cn } from '../lib/utils';
+
+export function Dashboard() {
+    // Data State
+    const [csvData, setCsvData] = useState([]);
+    const [template, setTemplate] = useState("");
+
+    // Config State
+    const [providerType, setProviderType] = useState(PROVIDERS.MOCK);
+    const [apiConfig, setApiConfig] = useState({
+        accountSid: '',
+        authToken: '',
+        fromNumber: ''
+    });
+
+    // Sending State
+    const [isSending, setIsSending] = useState(false);
+    const [progress, setProgress] = useState({ sent: 0, failed: 0 });
+    const [logs, setLogs] = useState([]);
+
+    const stopRef = useRef(false);
+
+    const columns = csvData.length > 0 ? Object.keys(csvData[0]) : [];
+
+    // Helper to add log
+    const addLog = (message, type = 'info') => {
+        const time = new Date().toLocaleTimeString();
+        setLogs(prev => [{ time, message, type }, ...prev]);
+    };
+
+    // Message Interpolation
+    const interpolate = (tpl, row) => {
+        let msg = tpl;
+        for (const [key, value] of Object.entries(row)) {
+            // Regex to replace {{Key}} case-insensitive
+            const regex = new RegExp(`{{${key}}}`, 'gi');
+            msg = msg.replace(regex, value || '');
+        }
+        return msg;
+    };
+
+    // Main Sending Logic
+    const startSending = async () => {
+        if (csvData.length === 0) {
+            alert("Please upload a CSV file first.");
+            return;
+        }
+        if (!template.trim()) {
+            alert("Please enter a message template.");
+            return;
+        }
+
+        setIsSending(true);
+        stopRef.current = false;
+
+        // Reset progress if starting fresh? Or continue? Let's reset for now.
+        if (progress.sent + progress.failed === csvData.length) {
+            setProgress({ sent: 0, failed: 0 });
+            setLogs([]);
+        }
+
+        const provider = getProvider(providerType);
+        addLog(`Starting bulk send using ${providerType.toUpperCase()}...`);
+
+        // Iterate!
+        // We skip already "processed" items if we want resume support, 
+        // but for simplicity we'll just start from index (sent + failed).
+        const startIndex = progress.sent + progress.failed;
+
+        for (let i = startIndex; i < csvData.length; i++) {
+            if (stopRef.current) {
+                addLog("Sending stopped by user.", "warning");
+                break;
+            }
+
+            const row = csvData[i];
+            const message = interpolate(template, row);
+
+            // Try to find a phone column
+            const phoneKey = Object.keys(row).find(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('mobile'));
+            const to = phoneKey ? row[phoneKey] : null;
+
+            if (!to) {
+                addLog(`Row ${i + 1}: No phone number found. Skipping.`, 'error');
+                setProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
+                continue;
+            }
+
+            try {
+                // Rate limit shim (1 sec delay)
+                await new Promise(r => setTimeout(r, 1000));
+
+                const result = await provider.send(to, message, apiConfig);
+
+                if (result.success) {
+                    addLog(`Sent to ${to} (ID: ${result.id})`);
+                    setProgress(prev => ({ ...prev, sent: prev.sent + 1 }));
+                } else {
+                    addLog(`Failed to ${to}: ${result.error}`, 'error');
+                    setProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
+                }
+
+            } catch (err) {
+                addLog(`System Error on row ${i + 1}: ${err.message}`, 'error');
+                setProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
+            }
+        }
+
+        setIsSending(false);
+        addLog("Batch processing finished.");
+    };
+
+    const stopSending = () => {
+        stopRef.current = true;
+    };
+
+    return (
+        <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
+            {/* Header */}
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Send className="w-6 h-6 text-blue-600" />
+                        <h1 className="text-xl font-bold tracking-tight">BulkSMS <span className="text-slate-400 font-normal">Pro</span></h1>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                            <span className={cn("w-2 h-2 rounded-full", isSending ? "bg-green-500 animate-pulse" : "bg-slate-400")}></span>
+                            {isSending ? "Active" : "Ready"}
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                {/* Left Column: Data & Editor */}
+                <div className="lg:col-span-7 space-y-6">
+                    <section>
+                        <h2 className="text-lg font-semibold mb-4 text-slate-800">1. Data Source</h2>
+                        <FileUpload onDataLoaded={setCsvData} />
+                    </section>
+
+                    <section className="h-[500px]">
+                        <h2 className="text-lg font-semibold mb-4 text-slate-800">2. Compose Message</h2>
+                        <MessageEditor
+                            template={template}
+                            setTemplate={setTemplate}
+                            columns={columns.filter(c => c !== "")}
+                        />
+                    </section>
+                </div>
+
+                {/* Right Column: Settings & Progress */}
+                <div className="lg:col-span-5 space-y-6">
+                    <section>
+                        <h2 className="text-lg font-semibold mb-4 text-slate-800">3. Configuration</h2>
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Settings className="w-4 h-4" /> Provider Settings
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Service Provider</Label>
+                                    <select
+                                        className="w-full flex h-10 items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={providerType}
+                                        onChange={(e) => setProviderType(e.target.value)}
+                                    >
+                                        <option value={PROVIDERS.MOCK}>Mock (Test Mode - Free)</option>
+                                        <option value={PROVIDERS.TWILIO}>Twilio (Cloud API)</option>
+                                    </select>
+                                </div>
+
+                                {providerType === PROVIDERS.TWILIO && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label>Account SID</Label>
+                                            <Input
+                                                type="password"
+                                                value={apiConfig.accountSid}
+                                                onChange={(e) => setApiConfig({ ...apiConfig, accountSid: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Auth Token</Label>
+                                            <Input
+                                                type="password"
+                                                value={apiConfig.authToken}
+                                                onChange={(e) => setApiConfig({ ...apiConfig, authToken: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>From Number</Label>
+                                            <Input
+                                                placeholder="+1234567890"
+                                                value={apiConfig.fromNumber}
+                                                onChange={(e) => setApiConfig({ ...apiConfig, fromNumber: e.target.value })}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </section>
+
+                    <section>
+                        <h2 className="text-lg font-semibold mb-4 text-slate-800">4. Execution</h2>
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            {!isSending ? (
+                                <Button
+                                    className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
+                                    size="lg"
+                                    onClick={startSending}
+                                    disabled={csvData.length === 0}
+                                >
+                                    <PlayCircle className="w-5 h-5" /> Start Sending
+                                </Button>
+                            ) : (
+                                <Button
+                                    className="w-full gap-2"
+                                    variant="destructive"
+                                    size="lg"
+                                    onClick={stopSending}
+                                >
+                                    <StopCircle className="w-5 h-5" /> Stop
+                                </Button>
+                            )}
+
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                className="w-full gap-2"
+                                onClick={() => {
+                                    setProgress({ sent: 0, failed: 0 });
+                                    setLogs([]);
+                                    setCsvData([]);
+                                    setTemplate("");
+                                }}
+                            >
+                                <RefreshCw className="w-4 h-4" /> Reset
+                            </Button>
+                        </div>
+
+                        <SendingProgress
+                            total={csvData.length}
+                            sent={progress.sent}
+                            failed={progress.failed}
+                            isSending={isSending}
+                            logs={logs}
+                        />
+                    </section>
+                </div>
+            </main>
+        </div>
+    );
+}
