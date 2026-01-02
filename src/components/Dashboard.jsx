@@ -7,7 +7,7 @@ import { getProvider, PROVIDERS } from '../lib/sms-providers';
 import { cn } from '../lib/utils';
 import { normalizePhoneNumber } from '../lib/phone-utils';
 import { Toaster, useToasts } from './Toaster';
-import { Calendar } from 'lucide-react';
+import { Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube, Calendar } from 'lucide-react';
 
 export function Dashboard() {
     // Data State
