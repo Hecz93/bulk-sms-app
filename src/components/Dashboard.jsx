@@ -12,6 +12,7 @@ import { Settings, Send, PlayCircle, StopCircle, RefreshCw, TestTube, Calendar }
 export function Dashboard() {
     // Data State
     const [csvData, setCsvData] = useState([]);
+    const [fileName, setFileName] = useState("");
     const [template, setTemplate] = useState("");
 
     // Config State
@@ -65,6 +66,12 @@ export function Dashboard() {
 
         const savedTemplate = localStorage.getItem('bulksms_template');
         if (savedTemplate) setTemplate(savedTemplate);
+
+        const savedFileName = localStorage.getItem('bulksms_fileName');
+        if (savedFileName) setFileName(savedFileName);
+
+        const savedScheduledTime = localStorage.getItem('bulksms_scheduledTime');
+        if (savedScheduledTime) setScheduledTime(savedScheduledTime);
     }, []);
 
     // Save apiConfig to localStorage whenever it changes
@@ -86,6 +93,16 @@ export function Dashboard() {
     useEffect(() => {
         localStorage.setItem('bulksms_template', template);
     }, [template]);
+
+    // Save fileName to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('bulksms_fileName', fileName);
+    }, [fileName]);
+
+    // Save scheduledTime to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('bulksms_scheduledTime', scheduledTime);
+    }, [scheduledTime]);
 
     // Helper to add log
     const addLog = (message, type = 'info') => {
@@ -339,7 +356,16 @@ export function Dashboard() {
                 <div className="lg:col-span-7 space-y-6">
                     <section>
                         <h2 className="text-lg font-semibold mb-4 text-slate-800">1. Data Source</h2>
-                        <FileUpload onDataLoaded={setCsvData} onSuccess={addToast} />
+                        <FileUpload
+                            onDataLoaded={setCsvData}
+                            onSuccess={addToast}
+                            onFileName={setFileName}
+                        />
+                        {fileName && (
+                            <div className="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                                <Send className="w-3 h-3" /> Currently loaded: <span className="font-semibold text-slate-700">{fileName}</span> ({csvData.length} records)
+                            </div>
+                        )}
                     </section>
 
                     <section className="min-h-[500px]">
@@ -544,11 +570,26 @@ export function Dashboard() {
                         </div>
 
                         {(isSending || isWaitingForSchedule) && (
-                            <SendingProgress
-                                progress={progress}
-                                total={csvData.length}
-                                logs={logs}
-                            />
+                            <div className="space-y-4">
+                                {isWaitingForSchedule && (
+                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 animate-pulse">
+                                        <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2 mb-1">
+                                            <Calendar className="w-4 h-4" /> UPCOMING CAMPAIGN
+                                        </h3>
+                                        <p className="text-xs text-blue-700">
+                                            Scheduled: <span className="font-bold">{new Date(scheduledTime).toLocaleString()}</span>
+                                        </p>
+                                        <p className="text-xs text-blue-600">
+                                            File: <span className="font-bold">{fileName || "Unknown CSV"}</span> ({csvData.length} contacts)
+                                        </p>
+                                    </div>
+                                )}
+                                <SendingProgress
+                                    progress={progress}
+                                    total={csvData.length}
+                                    logs={logs}
+                                />
+                            </div>
                         )}
                     </section>
                 </div>

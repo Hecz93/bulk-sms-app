@@ -4,7 +4,7 @@ import { Upload, FileType, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from './ui-base';
 import { cn } from '../lib/utils';
 
-export function FileUpload({ onDataLoaded, onSuccess }) {
+export function FileUpload({ onDataLoaded, onSuccess, onFileName }) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
@@ -40,7 +40,8 @@ export function FileUpload({ onDataLoaded, onSuccess }) {
                     const filteredData = results.data; // Assuming filteredData is meant to be results.data if no specific filtering logic is provided
                     if (filteredData.length > 0) {
                         onDataLoaded(filteredData);
-                        if (onSuccess) onSuccess(`Successfully loaded ${filteredData.length} contacts`);
+                        if (onFileName) onFileName(file.name);
+                        if (onSuccess) onSuccess(`Successfully loaded ${filteredData.length} contacts from ${file.name}`);
                     } else {
                         setSuccess(`Successfully loaded ${results.data.length} contacts.`);
                         onDataLoaded(results.data);
