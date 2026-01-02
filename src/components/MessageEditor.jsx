@@ -152,7 +152,7 @@ export function MessageEditor({ template, setTemplate, columns = [], previewRow 
                         </h4>
                         <p className="text-[10px] text-purple-700 leading-tight">
                             Use <strong>Spintax</strong> to vary messages. <br />
-                            Example: <code>{Hi | Hello}</code> sends "Hi" to half and "Hello" to the rest.
+                            Example: <code>{'{'}Hi | Hello{'}'}</code> sends "Hi" to half and "Hello" to the rest.
                         </p>
                     </div>
                 </div>
