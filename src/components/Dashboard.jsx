@@ -452,9 +452,30 @@ export function Dashboard() {
                                 onFileName={setFileName}
                             />
                             {fileName && (
-                                <div className="mt-3 p-2 bg-blue-50/50 rounded-lg border border-blue-100/50 text-[11px] text-slate-500 flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                    Loaded: <span className="font-bold text-slate-700 underline truncate">{fileName}</span> ({csvData.length} rows)
+                                <div className="mt-3 space-y-3">
+                                    <div className="p-2.5 bg-blue-50/50 rounded-xl border border-blue-100/50 text-[11px] text-slate-500 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                            <span>File: <span className="font-bold text-slate-700">{fileName}</span> ({csvData.length} contacts)</span>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setCsvData([])}>Change</Button>
+                                    </div>
+
+                                    {columns.length > 0 && (
+                                        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Personalization Tags Found</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {columns.map(col => (
+                                                    <code key={col} className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-bold rounded-md border border-slate-200">
+                                                        {`{{${col}}}`}
+                                                    </code>
+                                                ))}
+                                            </div>
+                                            <p className="mt-2 text-[9px] text-slate-400 italic">
+                                                Copy these tags into your message to automatically insert data from that column.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </section>

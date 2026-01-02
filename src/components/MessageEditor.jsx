@@ -125,27 +125,32 @@ export function MessageEditor({ template, setTemplate, columns = [], previewRow 
                         onChange={(e) => setTemplate(e.target.value)}
                     />
 
-                    {/* Variables Toolbar */}
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                            Click to Insert Variable
-                        </Label>
-                        <div className="flex flex-wrap gap-2 min-h-[30px]">
+                    {/* Variables Toolbar - Premium Redesign */}
+                    <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                Personalization Tags
+                            </Label>
+                            <span className="text-[9px] text-slate-400 font-medium">Click to insert</span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
                             {columns.length > 0 ? (
                                 columns.map((col) => (
                                     <button
                                         key={col}
                                         onClick={() => insertText(`{{${col}}}`)}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 text-xs font-medium rounded-md transition-all active:scale-95"
+                                        className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-600 text-slate-700 hover:text-white border border-slate-200 hover:border-blue-600 text-[11px] font-bold rounded-lg transition-all active:scale-95 shadow-sm"
                                     >
-                                        <Plus className="w-3 h-3" />
-                                        {col}
+                                        <Plus className="w-3 h-3 text-blue-500 group-hover:text-blue-100" />
+                                        <span className="font-mono">{`{{${col}}}`}</span>
+                                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))
                             ) : (
-                                <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-md border border-amber-100 w-full">
+                                <div className="flex items-center gap-2 py-3 px-4 text-xs text-amber-600 bg-amber-50/50 rounded-xl border border-dashed border-amber-200 w-full animate-pulse">
                                     <AlertTriangle className="w-4 h-4" />
-                                    Upload CSV to see variables
+                                    Scan a CSV file in Step 1 to unlock variables
                                 </div>
                             )}
                         </div>
